@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Video Trimmer</title>
+    <style>
+        body {
+            font-family: poppins;
+            background-color: #d9d9d9;
+            color: #333;
+            margin: 0;  
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            margin-top: 20px;
+            color: #000000;
+            font-size: 3em;
+        }
+
+        input[type="text"] {
+            width: 400px;
+            padding: 10px;
+            margin: 20px 0;
+            border: 3px solid #000000;
+            border-radius: 20px;
+        }
+
+        button {
+            font-family: poppins;
+            font-weight: bold;
+            padding: 15px 35px;
+            background-color: #000000;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            margin: 0px 0;
+        }
+
+        button:hover {
+            background-color: #ffa600;
+        }
+
+        #videoContainer {
+            margin: 20px 0;
+            width: 560px;
+            height: 315px;
+            display: flex;
+            overflow: hidden;
+            justify-content: center;
+            align-items: center;
+            border: 3px solid #000000;
+            border-radius: 20px;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .time-input {
+            font-family: poppins;
+            color: #000000;
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        label {
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        input[type="number"] {
+            font-family: poppins;
+            font-weight: bold;
+            text-align: center;
+            width: 90px;
+            padding: 5px;
+            margin: 0 5px;
+            border: 3px solid #000000;
+            border-radius: 20px;
+        }
+
+        #progressBarContainer {
+            display: none;
+            font-family: poppins;
+            font-weight: bolder;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 560px;
+            text-align: center;
+        }
+
+        #progressBar {
+            height: 10px;
+            width: 0;
+            background-color: #000000;
+            border-radius: 10px;
+        }
+
+        #progressText {
+            margin-top: 5px;
+            font-weight: bolder;
+        }
+
+        #trimmedVideoContainer {
+    display: block;
+}
+
+#trimmedVideoContainer video {
+    width: 560px;
+    height: 315px;
+    margin: 20px auto;
+    overflow: hidden;
+    justify-content: center;
+    align-items: center;
+    border: 3px solid #000000;
+    border-radius: 20px;
+    background-color: white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+#trimmedVideoContainer button {
+    display: block;
+    margin: 10px auto;
+}
+    </style>
+</head>
+<body>
+    <h1>YouTube Video Trimmer</h1>
+    <input type="text" id="youtubeUrl" placeholder="Enter YouTube URL">
+    <button onclick="loadYouTubeVideo()">Load Video</button>
+    <div id="videoContainer"></div>
+
+    <div class="controls" style="display: none;" id="controls">
+        <div class="time-input">
+            <label for="startTime">Start time (min:sec):</label>
+            <input type="number" id="startMinutes" placeholder="Min" min="0">
+            <input type="number" id="startSeconds" placeholder="Sec" min="0" max="59">
+        </div>
+        <div class="time-input">
+            <label for="endTime">End time (min:sec):</label>
+            <input type="number" id="endMinutes" placeholder="Min" min="0">
+            <input type="number" id="endSeconds" placeholder="Sec" min="0" max="59">
+        </div>
+        <button onclick="trimVideo()">Trim Video</button>
+    </div>
+
+    <div id="progressBarContainer">
+        <div id="progressBar"></div>
+        <div id="progressText">0%</div>
+    </div>
+
+    <div id="trimmedVideoContainer" style="display: none;">
+        <video id="trimmedVideo" width="560" height="315" controls></video>
+        <button id="downloadButton" class="download-button">Download Clip</button>
+    </div>
+
+    <script>
+        function loadYouTubeVideo() {
+            const url = document.getElementById('youtubeUrl').value;
+            const videoId = extractVideoId(url);
+            if (!videoId) {
+                alert("Invalid YouTube URL");
+                return;
+            }
+
+            const iframe = `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`;
+            document.getElementById('videoContainer').innerHTML = iframe;
+            document.getElementById('controls').style.display = 'flex';
+        }
+
+        function extractVideoId(url) {
+            const regex = /(?:https?:\/\/)?(?:www\.)?youtube\.com\/(?:watch\?v=|embed\/|v\/)?([^\s&]+)/;
+            const match = url.match(regex);
+            return match ? match[1] : null;
+        }
+
+        function calculateTime(minutes, seconds) {
+            return parseInt(minutes) * 60 + parseInt(seconds);
+        }
+
+        function updateProgressBar(percentage) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            progressBar.style.width = percentage + '%';
+            progressText.innerText = `${percentage}%`;
+        }
+
+        function trimVideo() {
+            const startMinutes = document.getElementById('startMinutes').value || "0";
+            const startSeconds = document.getElementById('startSeconds').value || "0";
+            const endMinutes = document.getElementById('endMinutes').value || "0";
+            const endSeconds = document.getElementById('endSeconds').value || "0";
+
+            const startTime = calculateTime(startMinutes, startSeconds);
+            const endTime = calculateTime(endMinutes, endSeconds);
+            const url = document.getElementById('youtubeUrl').value;
+
+            if (startTime >= endTime) {
+                alert("Start time must be less than end time.");
+                return;
+            }
+
+            document.getElementById('progressBarContainer').style.display = 'block';
+
+            let progressPercentage = 0;
+            const interval = setInterval(() => {
+                if (progressPercentage < 90) {
+                    progressPercentage += 2; // Increment by 1% each second
+                    updateProgressBar(progressPercentage);
+                }
+
+                fetch('/progress')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.complete) {
+                            clearInterval(interval);
+                            updateProgressBar(100);
+                            document.getElementById('progressBarContainer').style.display = 'none';
+
+                            document.getElementById('trimmedVideoContainer').scrollIntoView({ behavior: 'smooth' });
+                        }
+                    });
+            }, 1000); // Update progress every 1 second
+
+            fetch('/trim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, startTime, endTime }),
+})
+    .then((response) => response.blob())
+    .then((blob) => {
+        const videoUrl = URL.createObjectURL(blob);
+
+        // Wait until the progress bar is complete
+        const interval = setInterval(() => {
+            fetch('/progress')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.complete) {
+                        clearInterval(interval);
+
+                        // Display the trimmed video and download button
+                        const videoElement = document.getElementById('trimmedVideo');
+                        videoElement.src = videoUrl;
+                        videoElement.load(); // Load the video after setting the source
+                        videoElement.play(); // Play the video after loading
+
+                        document.getElementById('trimmedVideoContainer').style.display = 'block';
+
+                        // Add event listener to download button
+                        const downloadButton = document.getElementById('downloadButton');
+                        downloadButton.addEventListener('click', () => {
+                            const a = document.createElement('a');
+                            a.href = videoUrl;
+                            a.download = 'trimmed_video.mp4';
+                            a.click();
+                        });
+
+                        // Scroll to the trimmed video container
+                        document.getElementById('trimmedVideoContainer').scrollIntoView({ behavior: 'smooth' });
+                    }
+                });
+        }, 1000); // Check progress every 1 second
+    })
+    .catch((error) => {
+        clearInterval(interval);
+        console.error("Error trimming video:", error);
+    });
+        }
+    </script>
+</body>
+</html>

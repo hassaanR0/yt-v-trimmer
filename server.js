@@ -9,8 +9,6 @@ app.use(express.json());
 
 const execPromise = util.promisify(exec);
 
-let progress = { percentage: 0, complete: false };
-
 // Serve the static frontend files
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -20,44 +18,38 @@ app.get('/', (req, res) => {
 });
 
 // Progress endpoint
+let progress = { percentage: 0, complete: false };
 app.get('/progress', (req, res) => {
     res.json(progress);
 });
 
 app.post('/trim', async (req, res) => {
-    const { url, startTime, endTime } = req.body;
-    const outputPath = `trimmed_${Date.now()}.mp4`;
-
-    // Validate inputs
-    if (!url || startTime === undefined || endTime === undefined) {
-        return res.status(400).send("Missing required fields: 'url', 'startTime', or 'endTime'.");
-    }
-
-    if (startTime >= endTime) {
-        return res.status(400).send("Start time must be less than end time.");
-    }
-
-    // Reset progress
-    progress = { percentage: 0, complete: false };
-
-    // Construct yt-dlp command
-    const command = `yt-dlp -f bestvideo+bestaudio --merge-output-format mp4 ` +
-        `--external-downloader ffmpeg ` +
-        `--external-downloader-args "-ss ${startTime} -to ${endTime}" ` +
-        `"${url}" -o "${outputPath}"`;
-
     try {
+        const { url, startTime, endTime } = req.body;
+        const outputPath = `trimmed_${Date.now()}.mp4`;
+
+        // Validate inputs
+        if (!url || startTime === undefined || endTime === undefined) {
+            return res.status(400).send("Missing required fields: 'url', 'startTime', or 'endTime'.");
+        }
+
+        if (startTime >= endTime) {
+            return res.status(400).send("Start time must be less than end time.");
+        }
+
+        // Reset progress
+        progress = { percentage: 0, complete: false };
+
+        // Construct yt-dlp command
+        const command = `yt-dlp -f bestvideo+bestaudio --merge-output-format mp4 ` +
+            `--external-downloader ffmpeg ` +
+            `--external-downloader-args "-ss ${startTime} -to ${endTime}" ` +
+            `"${url}" -o "${outputPath}"`;
+
+        // Execute the command and wait for completion
         await execPromise(command);
 
         // Simulate progress updates
-        const interval = setInterval(() => {
-            if (progress.percentage < 90) {
-                progress.percentage += 10; // Simulate gradual progress
-            } else {
-                clearInterval(interval);
-            }
-        }, 1000);
-
         progress = { percentage: 100, complete: true };
 
         // Send the trimmed video file for download
@@ -69,7 +61,6 @@ app.post('/trim', async (req, res) => {
                 if (unlinkErr) console.error("Error deleting file:", unlinkErr);
             });
         });
-
     } catch (error) {
         console.error('Error processing video:', error);
         res.status(500).send("Error processing video.");

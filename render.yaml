@@ -1,6 +1,0 @@
-services:
-  - type: web
-    name: youtube-video-trimmer
-    env: node
-    buildCommand: npm install
-    startCommand: node server.js --port=10000

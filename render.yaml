@@ -3,6 +3,4 @@ services:
     name: youtube-video-trimmer
     env: node
     buildCommand: npm install
-    startCommand: node server.js
-    environment:
-      PORT: 10000
+    startCommand: node server.js --port=10000

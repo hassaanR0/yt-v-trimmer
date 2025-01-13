@@ -4,4 +4,5 @@ services:
     env: node
     buildCommand: npm install
     startCommand: node server.js
-    port: 10000
+    environment:
+      PORT: 10000

@@ -4,5 +4,4 @@ services:
     env: node
     buildCommand: npm install
     startCommand: node server.js
-    render:
       port: 10000

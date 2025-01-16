@@ -8,62 +8,74 @@ const app = express();
 app.use(express.json());
 
 const execPromise = util.promisify(exec);
+let progress = { percentage: 0, complete: false };
 
-// Serve the static frontend files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Route to serve the frontend
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Progress endpoint
-let progress = { percentage: 0, complete: false };
 app.get('/progress', (req, res) => {
     res.json(progress);
 });
 
 app.post('/trim', async (req, res) => {
+    const { url, startTime, endTime } = req.body;
+    const outputPath = `trimmed_${Date.now()}.mp4`;
+
+    if (!url || startTime === undefined || endTime === undefined) {
+        return res.status(400).send("Missing required fields: 'url', 'startTime', or 'endTime'.");
+    }
+
+    if (startTime >= endTime) {
+        return res.status(400).send("Start time must be less than end time.");
+    }
+
+    progress = { percentage: 0, complete: false };
+
     try {
-        const { url, startTime, endTime } = req.body;
-        const outputPath = `trimmed_${Date.now()}.mp4`;
+        // Add a 2-second buffer before start time for better accuracy
+        const bufferStart = Math.max(0, startTime - 2);
+        const adjustedDuration = endTime - bufferStart;
 
-        // Validate inputs
-        if (!url || startTime === undefined || endTime === undefined) {
-            return res.status(400).send("Missing required fields: 'url', 'startTime', or 'endTime'.");
-        }
-
-        if (startTime >= endTime) {
-            return res.status(400).send("Start time must be less than end time.");
-        }
-
-        // Reset progress
-        progress = { percentage: 0, complete: false };
-
-        // Construct yt-dlp command
-        const command = `yt-dlp -f bestvideo+bestaudio --merge-output-format mp4 ` +
-            `--external-downloader ffmpeg ` +
-            `--external-downloader-args "-ss ${startTime} -to ${endTime}" ` +
+        // Download and trim in one step using yt-dlp and ffmpeg
+        const command = `yt-dlp ` +
+            // Format selection prioritizing smaller size and compatibility
+            `-f "bestvideo[ext=mp4][filesize<50M]+bestaudio[ext=m4a]/mp4" ` +
+            // Download only the specific segment
+            `--download-sections "*${bufferStart}-${endTime}" ` +
+            // Force keyframes at cut points
+            `--force-keyframes-at-cuts ` +
+            // Post-processing to trim to exact timestamps
+            `--postprocessor-args "ffmpeg:-ss ${startTime - bufferStart} -t ${endTime - startTime}" ` +
             `"${url}" -o "${outputPath}"`;
 
-        // Execute the command and wait for completion
+        console.log('Executing command:', command);
+        
         await execPromise(command);
-
-        // Simulate progress updates
         progress = { percentage: 100, complete: true };
 
-        // Send the trimmed video file for download
-        res.download(outputPath, (err) => {
-            if (err) console.error("Error sending file:", err);
-
-            // Delete the output file after download
-            fs.unlink(outputPath, (unlinkErr) => {
-                if (unlinkErr) console.error("Error deleting file:", unlinkErr);
+        if (fs.existsSync(outputPath)) {
+            res.download(outputPath, (err) => {
+                if (err) {
+                    console.error("Error sending file:", err);
+                }
+                // Clean up output file after sending
+                if (fs.existsSync(outputPath)) {
+                    fs.unlink(outputPath, () => {});
+                }
             });
-        });
+        } else {
+            throw new Error('Output file was not created');
+        }
+
     } catch (error) {
         console.error('Error processing video:', error);
-        res.status(500).send("Error processing video.");
+        if (fs.existsSync(outputPath)) {
+            fs.unlink(outputPath, () => {});
+        }
+        res.status(500).send("Error processing video: " + error.message);
     }
 });
 
